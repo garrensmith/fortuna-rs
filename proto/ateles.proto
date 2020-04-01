@@ -1,0 +1,25 @@
+syntax = "proto3";
+package ateles;
+
+service Ateles {
+  rpc Execute(stream JSRequest) returns (stream JSResponse) {}
+}
+
+
+message JSRequest {
+    enum Action {
+        REWRITE = 0;
+        EVAL = 1;
+        CALL = 2;
+    }
+    Action action = 1;
+    string script = 2;
+    repeated string args = 3;
+    int32 timeout = 4;
+}
+
+
+message JSResponse {
+    int32 status = 1;
+    string result = 2;
+}
