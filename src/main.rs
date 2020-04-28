@@ -1,70 +1,75 @@
-use std::net::SocketAddr;
-use hyper::{Body, Request, Response, Server, Method, StatusCode};
-use hyper::service::{make_service_fn, service_fn};
+#![deny(warnings)]
 
-use ateles::{JsRequest, JsResponse};
-use prost::Message;
-use fortuna::{FortunaIsolate, init, JSEnv};
+use std::task::{Context, Poll};
 
-pub mod ateles {
-    tonic::include_proto!("ateles"); // The string specified here must match the proto package name
+use futures_util::future;
+use hyper::service::Service;
+use hyper::{Body, Request, Response};
+use std::sync::Arc;
+use fortuna::create_server;
+
+
+// const ROOT: &str = "/";
+
+#[derive(Debug, Clone)]
+pub struct Svc {
+    val: Arc<u32>
 }
 
-use std::{io, fs};
-use std::fs::{read_dir, write, File};
-use std::path::Path;
-
-async fn routes(req: Request<Body>) -> Result<Response<Body>, hyper::Error>  {
-
-    match (req.method(), req.uri().path()) {
-        (&Method::GET, "/") => {
-            Ok(Response::new(Body::from("HELLO")))
-        },
-        (&Method::GET, "/Health") => {
-            Ok(Response::new(Body::from("OK")))
-        },
-        (&Method::POST, "/Ateles/Execute") => {
-            let full_body = hyper::body::to_bytes(req.into_body()).await?;
-            let out = JsRequest::decode(full_body.clone()).unwrap();
-            println!("RECEIVED {:?} {:?}", full_body, out.action);
-            let js_resp = JsResponse{
-                status: 0,
-                result: "2".to_string()
-            };
-            let mut resp: Vec<u8> = Vec::new();
-            js_resp.encode(&mut resp).unwrap();
-            // JsReponse::encode(&resp);
-            Ok(Response::new(Body::from(resp)))
-        },
-        _ => {
-            let mut not_found = Response::default();
-            *not_found.status_mut() = StatusCode::NOT_FOUND;
-            Ok(not_found)
-        }
+impl Svc {
+    async fn test(&self) -> Result<Response<Body>, hyper::Error> {
+        Ok(Response::new(Body::from("hello")))
     }
 }
 
+impl Service<Request<Body>> for Svc {
+    type Response = Response<Body>;
+    type Error = hyper::Error;
+    type Future = future::BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Ok(()).into()
+    }
+
+    fn call(&mut self, _req: Request<Body>) -> Self::Future {
+        let me = self.clone();
+        let fut = async move {
+             let resp = me.test().await;
+            resp
+        };
+        Box::pin(fut)
+    }
+}
+
+pub struct MakeSvc;
+
+impl<T> Service<T> for MakeSvc {
+    type Response = Svc;
+    type Error = std::io::Error;
+    type Future = future::Ready<Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Ok(()).into()
+    }
+
+    fn call(&mut self, _: T) -> Self::Future {
+        future::ok(Svc{val: Arc::new(1)})
+    }
+}
 
 #[tokio::main]
-async fn main() {
-    // println!("hh {:?}", JS_CODE);
-    // read_file();
-    // println!("HEE {:?}", hello::rewrite_anon_fun_code);
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     fortuna::init_v8();
-    let js_env = JSEnv::new();
-    let isolate = js_env.create_isolate();
-    // let port = 8444;
-    // println!("Starting on {}", port);
-    //
-    // let addr = SocketAddr::from(([127, 0, 0, 1], port));
-    //
-    // let service = make_service_fn(|_| async { Ok::<_, hyper::Error>(service_fn(routes)) });
-    //
-    // let server = Server::bind(&addr).serve(service);
-    //
-    // // Run this server for... forever!
-    // if let Err(e) = server.await {
-    //     eprintln!("server error: {}", e);
-    // }
+    // pretty_env_logger::init();
 
+    let addr = "127.0.0.1:1337".parse().unwrap();
+
+    // let server = Server::bind(&addr).serve(MakeSvc);
+    let server = create_server(&addr);
+
+    println!("Listening on http://{}", addr);
+
+    server.await?;
+
+    Ok(())
 }

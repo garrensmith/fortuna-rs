@@ -93,13 +93,22 @@ impl JSEnv {
 impl FortunaIsolate {
 
     pub fn new(startup_data: &v8::OwnedStartupData) -> FortunaIsolate {
-        let isolate = FortunaIsolate::create_v8_isolate(&startup_data);
+        // let isolate = FortunaIsolate::create_v8_isolate(&startup_data);
+        let isolate = FortunaIsolate::create_v8_isolate();
         FortunaIsolate {
             isolate
         }
     }
 
-    fn create_v8_isolate(snapshot_blob: &v8::OwnedStartupData) -> v8::OwnedIsolate {
+    pub fn new_clean() -> FortunaIsolate {
+        let isolate = FortunaIsolate::create_v8_isolate();
+        FortunaIsolate {
+            isolate
+        }
+    }
+
+    // fn create_v8_isolate(snapshot_blob: &v8::OwnedStartupData) -> v8::OwnedIsolate {
+    fn create_v8_isolate() -> v8::OwnedIsolate {
         let safe_obj: v8::PropertyAttribute = v8::DONT_DELETE + v8::DONT_ENUM + v8::READ_ONLY;
         // let source_str = r#"
         //     let test = () => "hello from here";
@@ -107,7 +116,7 @@ impl FortunaIsolate {
 
         let mut create_params = v8::Isolate::create_params();
         create_params.set_array_buffer_allocator(v8::new_default_allocator());
-        create_params.set_snapshot_blob(&snapshot_blob);
+        // create_params.set_snapshot_blob(&snapshot_blob);
         let mut isolate = v8::Isolate::new(create_params);
 
         let mut handle_scope = v8::HandleScope::new(&mut isolate);
@@ -164,6 +173,9 @@ impl FortunaIsolate {
     }
 
 }
+
+unsafe impl Send for FortunaIsolate {}
+unsafe impl Sync for FortunaIsolate {}
 
 
 
