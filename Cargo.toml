@@ -13,6 +13,7 @@ tonic = "0.1.1"
 hyper = "0.13"
 tokio = { version = "0.2", features = ["full"] }
 futures-util = "0.3.4"
+crossbeam = "0.7.3"
 
 [build-dependencies]
 tonic-build = "0.1.1"

@@ -2,12 +2,34 @@ use rusty_v8 as v8;
 use std::time::{Duration, Instant};
 use std::convert::TryFrom;
 use rusty_v8::OwnedStartupData;
+use std::thread;
 
 include!(concat!(env!("OUT_DIR"), "/js_startup_code.rs"));
 
+// enum Action {
+//     Rewrite,
+//     Eval,
+//     Call
+// }
 
+// pub struct Instruction {
+//     action: Action,
+//     script: String,
+//     // args: Vec<String>,
+//     // timeout: uint32,
+// }
+//
+// impl From<JsRequest> for Instruction {
+//     fn from(request: JSRequest) -> Self {
+//         Instruction {
+//             action: Action::Eval,
+//             script: request.script
+//         }
+//     }
+// }
 pub struct FortunaIsolate {
-    isolate: v8::OwnedIsolate
+    isolate: v8::OwnedIsolate,
+    global_context: v8::Global<v8::Context>
 }
 
 pub struct JSEnv {
@@ -60,8 +82,6 @@ impl JSEnv {
 
     // adapted from Deno https://github.com/denoland/rusty_v8/blob/master/tests/test_api.rs#L1714
     fn create_startup_data() -> v8::OwnedStartupData {
-        // First we create the snapshot, there is a single global variable 'a' set to
-        // the value 3.
         let mut snapshot_creator = v8::SnapshotCreator::new(None);
         {
             // TODO(ry) this shouldn't be necessary. workaround unfinished business in
@@ -92,28 +112,23 @@ impl JSEnv {
 
 impl FortunaIsolate {
 
-    pub fn new(startup_data: &v8::OwnedStartupData) -> FortunaIsolate {
+    pub fn new(_startup_data: &v8::OwnedStartupData) -> FortunaIsolate {
         // let isolate = FortunaIsolate::create_v8_isolate(&startup_data);
-        let isolate = FortunaIsolate::create_v8_isolate();
-        FortunaIsolate {
-            isolate
-        }
+        Self::create_isolate()
     }
 
     pub fn new_clean() -> FortunaIsolate {
-        let isolate = FortunaIsolate::create_v8_isolate();
-        FortunaIsolate {
-            isolate
-        }
+        Self::create_isolate()
     }
 
     // fn create_v8_isolate(snapshot_blob: &v8::OwnedStartupData) -> v8::OwnedIsolate {
-    fn create_v8_isolate() -> v8::OwnedIsolate {
+    fn create_isolate() -> FortunaIsolate {
         let safe_obj: v8::PropertyAttribute = v8::DONT_DELETE + v8::DONT_ENUM + v8::READ_ONLY;
         // let source_str = r#"
         //     let test = () => "hello from here";
         // "#;
 
+        let mut global_context = v8::Global::<v8::Context>::new();
         let mut create_params = v8::Isolate::create_params();
         create_params.set_array_buffer_allocator(v8::new_default_allocator());
         // create_params.set_snapshot_blob(&snapshot_blob);
@@ -123,10 +138,26 @@ impl FortunaIsolate {
         let scope = handle_scope.enter();
 
         let context = v8::Context::new(scope);
+
         let mut cs = v8::ContextScope::new(scope, context);
         let scope = cs.enter();
 
-        isolate
+        // Add default map functions
+        let source = v8::String::new(scope, JS_CODE).unwrap();
+        let mut script =
+            v8::Script::compile(scope, context, source, None).unwrap();
+        script.run(scope, context).unwrap();
+
+        global_context.set(scope, context);
+
+        FortunaIsolate {
+            isolate,
+            global_context
+        }
+
+        // let mut cs = v8::ContextScope::new(scope, context);
+        // let scope = cs.enter();
+
 
         // let object_templ = v8::ObjectTemplate::new(scope);
         // let function_templ = v8::FunctionTemplate::new(scope, print_callback);
@@ -154,35 +185,79 @@ impl FortunaIsolate {
         // let mut script = v8::Script::compile(scope, context, code, None).unwrap();
         // let result = script.run(scope, context).unwrap();
         // let result = result.to_string(scope).unwrap();
+
+        // isolate
     }
 
+    // pub fn process(&mut self, instruction: &Instruction) -> String {
+    //     self.eval(instruction.script.as_str(), &[])
+    // }
 
-    pub fn eval(&mut self, script_str: &str, args: &[&str]) -> String {
-        // let mut isolate = &self.isolate;
-
+    pub fn eval(&mut self, script_str: &str, _args: &[String]) -> String {
+        println!("script {:?}", script_str);
         let mut hs = v8::HandleScope::new(&mut self.isolate);
         let scope = hs.enter();
-        let context = v8::Context::new(scope);
+        let context = self.global_context.get(scope).unwrap();
+        // let context = v8::Context::new(scope);
         let mut cs = v8::ContextScope::new(scope, context);
         let scope = cs.enter();
         let source = v8::String::new(scope, script_str).unwrap();
         let mut script =
             v8::Script::compile(scope, context, source, None).unwrap();
         let result = script.run(scope, context).unwrap();
-        result.to_string(scope).unwrap().to_rust_string_lossy(scope)
+        let result_json_string = v8::json::stringify(context, result).unwrap();
+        let result_string = result_json_string.to_rust_string_lossy(scope);
+        println!("result eval: {}", result_string);
+
+        if result_string == "undefined".to_string() {
+            return "null".to_string();
+        }
+        result_string
+    }
+
+    pub fn call(&mut self, raw_fun_name: &str, args: &[String]) -> String {
+        println!("Call {:?} args {:?}", raw_fun_name, args);
+
+        let mut hs = v8::HandleScope::new(&mut self.isolate);
+        let scope = hs.enter();
+        let context = self.global_context.get(scope).unwrap();
+        // let context = v8::Context::new(scope);
+        let mut cs = v8::ContextScope::new(scope, context);
+        let scope = cs.enter();
+
+        // let script_str = "function double(x) {return x * 2;};";
+        // let source = v8::String::new(scope, script_str).unwrap();
+        // let mut script =
+        //     v8::Script::compile(scope, context, source, None).unwrap();
+        // let _result_ignore = script.run(scope, context).unwrap();
+
+        let global = context.global(scope);
+        let name = v8::String::new(scope, raw_fun_name).unwrap();
+        let val_func = global.get(scope, context, name.into()).unwrap();
+        let func = v8::Local::<v8::Function>::try_from(val_func).unwrap();
+        let receiver = context.global(scope);
+
+        let val_args: Vec<v8::Local<v8::Value>> = args.iter().map(|arg| {
+            let v8_arg = v8::String::new(scope, arg).unwrap();
+            v8::Local::<v8::Value>::try_from(v8_arg).unwrap()
+        }).collect();
+
+        let resp = func.call(scope, context, receiver.into(), val_args.as_slice()).unwrap();
+        // let result = resp.to_string(scope).unwrap();
+        let result = v8::json::stringify(context, resp).unwrap();
+        let result_string = result.to_rust_string_lossy(scope);
+        println!("result: {}", result_string);
+        result_string
     }
 
 }
-
-unsafe impl Send for FortunaIsolate {}
-unsafe impl Sync for FortunaIsolate {}
-
 
 
 pub fn init() {
     let platform = v8::new_default_platform();
     v8::V8::initialize_platform(platform);
     v8::V8::initialize();
+
 }
 
 // Not really needed

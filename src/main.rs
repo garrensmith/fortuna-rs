@@ -6,7 +6,7 @@ use futures_util::future;
 use hyper::service::Service;
 use hyper::{Body, Request, Response};
 use std::sync::Arc;
-use fortuna::create_server;
+use fortuna::{create_server, init_v8};
 
 
 // const ROOT: &str = "/";
@@ -59,12 +59,10 @@ impl<T> Service<T> for MakeSvc {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    fortuna::init_v8();
+    init_v8();
     // pretty_env_logger::init();
 
-    let addr = "127.0.0.1:1337".parse().unwrap();
-
-    // let server = Server::bind(&addr).serve(MakeSvc);
+    let addr = "127.0.0.1:8444".parse().unwrap();
     let server = create_server(&addr);
 
     println!("Listening on http://{}", addr);

@@ -9,22 +9,13 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-
+//
 // Based on the normalizeFunction which can be
 // found here:
+//
 //  https://github.com/dmunch/couch-chakra/blob/master/js/normalizeFunction.js
 
-if (typeof module !== "undefined") {
-    esprima = require("./esprima");
-    // using the escodegen from node for now
-    escodegen = require("escodegen");
-
-    module.exports = {
-        rewriteAnonFun
-    };
-}
-
-function rewriteAnonFun(fun) {
+function rewriteFunInt(fun) {
     const ast = esprima.parse(fun);
     let idx = ast.body.length - 1;
     let decl = {};
@@ -48,4 +39,18 @@ function rewriteAnonFun(fun) {
 
     // Generate source from the rewritten AST
     return escodegen.generate(ast);
+}
+
+
+function rewriteFun(funJSON) {
+    const fun = JSON.parse(funJSON);
+    return rewriteFunInt(fun);
+}
+
+function rewriteFuns(funsJSON) {
+    let funs = JSON.parse(funsJSON);
+    const results = Array.from(funs, (fun) => {
+        return rewriteFunInt(fun);
+    });
+    return results;
 }
