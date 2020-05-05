@@ -1,7 +1,6 @@
 use std::env;
 use std::fs;
-use std::fs::{read_dir, write, File};
-use std::io;
+use std::fs::{read_dir};
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,7 +27,7 @@ fn create_js_src_file() -> Result<(), Box<dyn std::error::Error>> {
 
     let code = format!("pub const JS_CODE: &str = r#\"{}\"#;", js_codes);
 
-    fs::write(dest_path, code);
+    fs::write(dest_path, code).unwrap();
 
     Ok(())
 }

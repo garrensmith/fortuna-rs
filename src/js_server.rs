@@ -1,11 +1,10 @@
 use crossbeam::crossbeam_channel::{
-    select, unbounded as cross_unbounded, Receiver as CrossReceiver, Sender as CrossSender,
+    RecvError, select, unbounded as cross_unbounded, Receiver as CrossReceiver, Sender as CrossSender,
 };
 
 // use tokio::sync::mpsc as tokio_mpsc;
 // use tokio::sync::mpsc::{unbounded_channel as tokio_channel, UnboundedSender as TokioSender, UnboundedReceiver as TokioReceiver};
-use crate::{js_engine, FortunaIsolate};
-use std::sync::Arc;
+use crate::{FortunaIsolate};
 use std::thread;
 
 type ServerTx = CrossSender<String>;
@@ -56,9 +55,6 @@ impl JSServer {
                                 println!("exiting RecvError");
                                 break;
                             }
-                            Err(error) => {
-                                println!("Error {:?}", error)
-                            }
                         }
                     }
                 }
@@ -80,10 +76,6 @@ impl JSServer {
             Ops::REWRITE => {
                 self.call(cmd.payload, cmd.args.as_slice());
                 true
-            }
-            _ => {
-                println!("unsupported cmd");
-                false
             }
         }
     }
@@ -107,7 +99,7 @@ pub struct JSClient {
 
 impl JSClient {
     pub fn run(&self, cmd: Command) -> String {
-        self.tx.send(cmd);
+        self.tx.send(cmd).unwrap();
         self.rx.recv().unwrap()
     }
 }

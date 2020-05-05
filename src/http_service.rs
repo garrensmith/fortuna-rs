@@ -1,24 +1,17 @@
 use std::task::{Context, Poll};
 
 use hyper::service::Service;
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::{Arc, Mutex};
 
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
 
 use futures_util::future;
 
-use crate::{FortunaIsolate, JSEnv};
-
-use ateles::{js_request, JsRequest, JsResponse};
+use ateles::{JsRequest, JsResponse};
 use hyper::server::conn::AddrIncoming;
 use prost::Message;
 use std::net::SocketAddr;
 
 use crate::js_server::{create_js_env, Command, JSClient, Ops};
-use crossbeam::crossbeam_channel::{unbounded, Receiver, Sender};
-use std::thread;
 
 pub mod ateles {
     tonic::include_proto!("ateles"); // The string specified here must match the proto package name
@@ -57,7 +50,7 @@ impl Svc {
             (&Method::GET, "/Health") => Ok(Response::new(Body::from("OK"))),
             (&Method::POST, "/Ateles/Execute") => {
                 let full_body = hyper::body::to_bytes(req.into_body()).await?;
-                let js_request = JsRequest::decode(full_body.clone()).unwrap();
+                let js_request = JsRequest::decode(full_body).unwrap();
                 let resp = self.js_client.run(js_request.into());
                 let js_resp = JsResponse {
                     status: 0,
@@ -89,8 +82,7 @@ impl Service<Request<Body>> for Svc {
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         let mut me = self.clone();
         let fut = async move {
-            let resp = me.handle_resp(req).await;
-            resp
+            me.handle_resp(req).await
         };
         Box::pin(fut)
     }

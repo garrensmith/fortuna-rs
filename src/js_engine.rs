@@ -1,32 +1,12 @@
 use rusty_v8 as v8;
 use rusty_v8::OwnedStartupData;
 use std::convert::TryFrom;
-use std::thread;
 use std::time::{Duration, Instant};
 
+// This is created in build.rs and is all the required js code added into
+// a byte array
 include!(concat!(env!("OUT_DIR"), "/js_startup_code.rs"));
 
-// enum Action {
-//     Rewrite,
-//     Eval,
-//     Call
-// }
-
-// pub struct Instruction {
-//     action: Action,
-//     script: String,
-//     // args: Vec<String>,
-//     // timeout: uint32,
-// }
-//
-// impl From<JsRequest> for Instruction {
-//     fn from(request: JSRequest) -> Self {
-//         Instruction {
-//             action: Action::Eval,
-//             script: request.script
-//         }
-//     }
-// }
 pub struct FortunaIsolate {
     isolate: v8::OwnedIsolate,
     global_context: v8::Global<v8::Context>,
@@ -40,28 +20,18 @@ pub fn print() {
     println!("hello");
 }
 
-// fn data_is_true_callback(
-//     _scope: v8::FunctionCallbackScope,
-//     args: v8::FunctionCallbackArguments,
-//     _rv: v8::ReturnValue,
-// ) {
-//     let data = args.data();
-//     assert!(data.is_some());
-//     let data = data.unwrap();
-//     assert!(data.is_true());
-// }
 
-fn print_callback(
-    scope: v8::FunctionCallbackScope,
-    args: v8::FunctionCallbackArguments,
-    mut rv: v8::ReturnValue,
-) {
-    for i in 0..args.length() {
-        let arg1 = args.get(i).to_string(scope).unwrap();
-        println!("{:?}", arg1.to_rust_string_lossy(scope));
-    }
-    rv.set(v8::Boolean::new(scope, true).into())
-}
+// fn print_callback(
+//     scope: v8::FunctionCallbackScope,
+//     args: v8::FunctionCallbackArguments,
+//     mut rv: v8::ReturnValue,
+// ) {
+//     for i in 0..args.length() {
+//         let arg1 = args.get(i).to_string(scope).unwrap();
+//         println!("{:?}", arg1.to_rust_string_lossy(scope));
+//     }
+//     rv.set(v8::Boolean::new(scope, true).into())
+// }
 
 impl JSEnv {
     pub fn new() -> JSEnv {
@@ -120,7 +90,7 @@ impl FortunaIsolate {
 
     // fn create_v8_isolate(snapshot_blob: &v8::OwnedStartupData) -> v8::OwnedIsolate {
     fn create_isolate() -> FortunaIsolate {
-        let safe_obj: v8::PropertyAttribute = v8::DONT_DELETE + v8::DONT_ENUM + v8::READ_ONLY;
+        // let safe_obj: v8::PropertyAttribute = v8::DONT_DELETE + v8::DONT_ENUM + v8::READ_ONLY;
 
         let mut global_context = v8::Global::<v8::Context>::new();
         let mut create_params = v8::Isolate::create_params();
@@ -195,7 +165,7 @@ impl FortunaIsolate {
         let result_string = result_json_string.to_rust_string_lossy(scope);
         println!("result eval: {}", result_string);
 
-        if result_string == "undefined".to_string() {
+        if result_string == "undefined" {
             return "null".to_string();
         }
         result_string
