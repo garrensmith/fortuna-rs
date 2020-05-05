@@ -1,6 +1,6 @@
 use std::sync::Once;
 
-use fortuna::{init_v8};
+use fortuna::init_v8;
 
 static INIT: Once = Once::new();
 

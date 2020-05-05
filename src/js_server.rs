@@ -1,11 +1,12 @@
-
-use crossbeam::crossbeam_channel::{select, unbounded as cross_unbounded, Receiver as CrossReceiver, Sender as CrossSender};
+use crossbeam::crossbeam_channel::{
+    select, unbounded as cross_unbounded, Receiver as CrossReceiver, Sender as CrossSender,
+};
 
 // use tokio::sync::mpsc as tokio_mpsc;
 // use tokio::sync::mpsc::{unbounded_channel as tokio_channel, UnboundedSender as TokioSender, UnboundedReceiver as TokioReceiver};
-use std::thread;
 use crate::{js_engine, FortunaIsolate};
 use std::sync::Arc;
+use std::thread;
 
 type ServerTx = CrossSender<String>;
 type ServerRx = CrossReceiver<Command>;
@@ -17,30 +18,28 @@ pub enum Ops {
     REWRITE,
     EVAL,
     CALL,
-    EXIT
+    EXIT,
 }
 
 pub struct Command {
     pub operation: Ops,
     pub payload: String,
-    pub args: Vec<String>
+    pub args: Vec<String>,
 }
-
 
 struct JSServer {
     send: ServerTx,
     receive: ServerRx,
-    isolate: FortunaIsolate
+    isolate: FortunaIsolate,
 }
 
 impl JSServer {
-
-    fn start (send: ServerTx, receive: ServerRx) {
+    fn start(send: ServerTx, receive: ServerRx) {
         thread::spawn(move || {
             let mut server = JSServer {
                 receive,
                 send,
-                isolate: FortunaIsolate::new_clean()
+                isolate: FortunaIsolate::new_clean(),
             };
 
             loop {
@@ -73,11 +72,11 @@ impl JSServer {
             Ops::EVAL => {
                 self.eval(cmd.payload);
                 true
-            },
+            }
             Ops::CALL => {
                 self.call(cmd.payload, cmd.args.as_slice());
                 true
-            },
+            }
             Ops::REWRITE => {
                 self.call(cmd.payload, cmd.args.as_slice());
                 true
@@ -100,15 +99,13 @@ impl JSServer {
     }
 }
 
-
 #[derive(Clone)]
 pub struct JSClient {
     pub tx: ClientTx,
-    pub rx: ClientRx
+    pub rx: ClientRx,
 }
 
 impl JSClient {
-
     pub fn run(&self, cmd: Command) -> String {
         self.tx.send(cmd);
         self.rx.recv().unwrap()
@@ -130,13 +127,9 @@ pub fn create_js_env() -> JSClient {
     let (tx1, rx1) = cross_unbounded::<Command>();
     let (tx2, rx2) = cross_unbounded::<String>();
 
-    let client = JSClient {
-        tx: tx1,
-        rx: rx2
-    };
+    let client = JSClient { tx: tx1, rx: rx2 };
 
     JSServer::start(tx2, rx1);
 
     client
 }
-
