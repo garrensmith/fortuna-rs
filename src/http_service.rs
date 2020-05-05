@@ -42,26 +42,13 @@ impl From<ateles::JsRequest> for Command {
 
 #[derive(Clone)]
 pub struct Svc {
-    // isolate: Arc<Mutex<FortunaIsolate>>
-    // isolate: FortunaIsolate
     js_client: JSClient
 }
 
 impl Svc  {
-    // pub fn new(js_client: &JSClient) -> Svc {
-    //     Svc {
-    //         js_client.clon
-    //         // isolate: Arc::new(Mutex::new(FortunaIsolate::new_clean()))
-    //     }
-    // }
-
     pub async fn handle_resp(&mut self, req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
         match (req.method(), req.uri().path()) {
             (&Method::GET, "/") => {
-                // self.js_client.tx.send("hello".to_string());
-                // let resp = self.js_client.rx.recv().unwrap();
-                // let fmt = format!("hello with {:}", resp);
-                // Ok(Response::new(Body::from(fmt)))
                 Ok(Response::new(Body::from("HELLO Ateles on Rust with V8!!!!")))
             },
             (&Method::GET, "/Health") => {
@@ -70,30 +57,14 @@ impl Svc  {
             (&Method::POST, "/Ateles/Execute") => {
                 let full_body = hyper::body::to_bytes(req.into_body()).await?;
                 let js_request = JsRequest::decode(full_body.clone()).unwrap();
-                println!("RECEIVED {:?} {:?}", full_body, js_request.action);
-                // let mut isolate = self.isolate.lock().unwrap();
                 let resp = self.js_client.run(js_request.into());
-                println!("eval {:?}", resp);
                 let js_resp = JsResponse {
                     status: 0,
                     result: resp
                 };
-                // let js_resp = match js_request.action {
-                //     1 => {
-                //         // let result = isolate.eval(&js_request.script.as_str(), &js_request.args.as_slice());
-                //     },
-                //     _ => {
-                //         JsResponse {
-                //             status: 1,
-                //             result: "Unsupported".to_string()
-                //         }
-                //     }
-                // };
-                // let instruction: Instruction = js_request.into();
-                // let result = self.isolate.process(&instruction);
+
                 let mut resp: Vec<u8> = Vec::new();
                 js_resp.encode(&mut resp).unwrap();
-                // JsReponse::encode(&resp);
                 Ok(Response::new(Body::from(resp)))
             },
             _ => {

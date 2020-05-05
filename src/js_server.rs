@@ -37,7 +37,6 @@ impl JSServer {
 
     fn start (send: ServerTx, receive: ServerRx) {
         thread::spawn(move || {
-            let mut i = 0;
             let mut server = JSServer {
                 receive,
                 send,
@@ -128,7 +127,6 @@ impl JSClient {
 // }
 
 pub fn create_js_env() -> JSClient {
-    // let (async_tx, mut async_rx) = tokio_channel::<String>();
     let (tx1, rx1) = cross_unbounded::<Command>();
     let (tx2, rx2) = cross_unbounded::<String>();
 
@@ -139,7 +137,6 @@ pub fn create_js_env() -> JSClient {
 
     JSServer::start(tx2, rx1);
 
-    // tx1.send("Hello Server".to_string());
     client
 }
 

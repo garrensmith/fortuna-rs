@@ -124,9 +124,6 @@ impl FortunaIsolate {
     // fn create_v8_isolate(snapshot_blob: &v8::OwnedStartupData) -> v8::OwnedIsolate {
     fn create_isolate() -> FortunaIsolate {
         let safe_obj: v8::PropertyAttribute = v8::DONT_DELETE + v8::DONT_ENUM + v8::READ_ONLY;
-        // let source_str = r#"
-        //     let test = () => "hello from here";
-        // "#;
 
         let mut global_context = v8::Global::<v8::Context>::new();
         let mut create_params = v8::Isolate::create_params();
@@ -189,12 +186,8 @@ impl FortunaIsolate {
         // isolate
     }
 
-    // pub fn process(&mut self, instruction: &Instruction) -> String {
-    //     self.eval(instruction.script.as_str(), &[])
-    // }
-
     pub fn eval(&mut self, script_str: &str, _args: &[String]) -> String {
-        println!("script {:?}", script_str);
+        // println!("script {:?}", script_str);
         let mut hs = v8::HandleScope::new(&mut self.isolate);
         let scope = hs.enter();
         let context = self.global_context.get(scope).unwrap();
@@ -221,15 +214,8 @@ impl FortunaIsolate {
         let mut hs = v8::HandleScope::new(&mut self.isolate);
         let scope = hs.enter();
         let context = self.global_context.get(scope).unwrap();
-        // let context = v8::Context::new(scope);
         let mut cs = v8::ContextScope::new(scope, context);
         let scope = cs.enter();
-
-        // let script_str = "function double(x) {return x * 2;};";
-        // let source = v8::String::new(scope, script_str).unwrap();
-        // let mut script =
-        //     v8::Script::compile(scope, context, source, None).unwrap();
-        // let _result_ignore = script.run(scope, context).unwrap();
 
         let global = context.global(scope);
         let name = v8::String::new(scope, raw_fun_name).unwrap();
@@ -243,7 +229,6 @@ impl FortunaIsolate {
         }).collect();
 
         let resp = func.call(scope, context, receiver.into(), val_args.as_slice()).unwrap();
-        // let result = resp.to_string(scope).unwrap();
         let result = v8::json::stringify(context, resp).unwrap();
         let result_string = result.to_rust_string_lossy(scope);
         println!("result: {}", result_string);
