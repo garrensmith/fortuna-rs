@@ -4,8 +4,9 @@ use crossbeam::crossbeam_channel::{
 
 // use tokio::sync::mpsc as tokio_mpsc;
 // use tokio::sync::mpsc::{unbounded_channel as tokio_channel, UnboundedSender as TokioSender, UnboundedReceiver as TokioReceiver};
-use crate::{FortunaIsolate};
+use crate::{FortunaIsolate, JSEnv};
 use std::thread;
+use std::fmt::{Debug};
 
 type ServerTx = CrossSender<String>;
 type ServerRx = CrossReceiver<Command>;
@@ -13,6 +14,7 @@ type ServerRx = CrossReceiver<Command>;
 type ClientTx = CrossSender<Command>;
 type ClientRx = CrossReceiver<String>;
 
+#[derive(Debug)]
 pub enum Ops {
     REWRITE,
     EVAL,
@@ -20,6 +22,7 @@ pub enum Ops {
     EXIT,
 }
 
+#[derive(Debug)]
 pub struct Command {
     pub operation: Ops,
     pub payload: String,
@@ -33,12 +36,13 @@ struct JSServer {
 }
 
 impl JSServer {
-    fn start(send: ServerTx, receive: ServerRx) {
+    fn start(js_env: &JSEnv, send: ServerTx, receive: ServerRx) {
+        let data = js_env.startup_data.clone();
         thread::spawn(move || {
             let mut server = JSServer {
                 receive,
                 send,
-                isolate: FortunaIsolate::new_clean(),
+                isolate: FortunaIsolate::new_from_snapshot(data.as_slice()),
             };
 
             loop {
@@ -115,13 +119,13 @@ impl JSClient {
 //     }
 // }
 
-pub fn create_js_env() -> JSClient {
+pub fn create_js_env(js_env: &JSEnv) -> JSClient {
     let (tx1, rx1) = cross_unbounded::<Command>();
     let (tx2, rx2) = cross_unbounded::<String>();
 
     let client = JSClient { tx: tx1, rx: rx2 };
 
-    JSServer::start(tx2, rx1);
+    JSServer::start(js_env, tx2, rx1);
 
     client
 }

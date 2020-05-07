@@ -1,6 +1,6 @@
 use fortuna::{create_server, init_v8};
 
-#[tokio::main]
+#[tokio::main(core_threads = 6)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_v8();
     // pretty_env_logger::init();

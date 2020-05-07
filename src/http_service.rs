@@ -12,6 +12,8 @@ use prost::Message;
 use std::net::SocketAddr;
 
 use crate::js_server::{create_js_env, Command, JSClient, Ops};
+use crate::JSEnv;
+use std::time::Instant;
 
 pub mod ateles {
     tonic::include_proto!("ateles"); // The string specified here must match the proto package name
@@ -43,14 +45,21 @@ impl Svc {
         &mut self,
         req: Request<Body>,
     ) -> Result<Response<Body>, hyper::Error> {
+        // println!("req {:?}", req.uri().path());
         match (req.method(), req.uri().path()) {
-            (&Method::GET, "/") => Ok(Response::new(Body::from(
+            (&Method::GET, "/") => {
+                // println!("hello");
+                Ok(Response::new(Body::from(
                 "HELLO Ateles on Rust with V8!!!!",
-            ))),
+            )))},
             (&Method::GET, "/Health") => Ok(Response::new(Body::from("OK"))),
             (&Method::POST, "/Ateles/Execute") => {
+                let start = Instant::now();
+
                 let full_body = hyper::body::to_bytes(req.into_body()).await?;
+                // println!("body {:?}", full_body);
                 let js_request = JsRequest::decode(full_body).unwrap();
+                let cmd: Command = js_request.clone().into();
                 let resp = self.js_client.run(js_request.into());
                 let js_resp = JsResponse {
                     status: 0,
@@ -59,6 +68,7 @@ impl Svc {
 
                 let mut resp: Vec<u8> = Vec::new();
                 js_resp.encode(&mut resp).unwrap();
+                println!("request {:?} took {:?}", cmd.operation, start.elapsed());
                 Ok(Response::new(Body::from(resp)))
             }
             _ => {
@@ -88,11 +98,16 @@ impl Service<Request<Body>> for Svc {
     }
 }
 
-pub struct MakeService {}
+pub struct MakeService {
+    js_env: JSEnv
+}
 
 impl MakeService {
     pub fn new() -> MakeService {
-        MakeService {}
+
+        MakeService {
+            js_env: JSEnv::new()
+        }
     }
 }
 
@@ -107,7 +122,7 @@ impl<T> Service<T> for MakeService {
 
     fn call(&mut self, _: T) -> Self::Future {
         let svc = Svc {
-            js_client: create_js_env(),
+            js_client: create_js_env(&self.js_env),
         };
         future::ok(svc)
     }
