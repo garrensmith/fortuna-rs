@@ -113,12 +113,12 @@ async fn map_doc(client: &Client) {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
-    let reqs = 0..10000;
+    let reqs = 0..1;
 
     let fetches = stream::iter(
         reqs.map(|_| {
             async {
-                let docs = 0..100;
+                let docs = 0..10000;
                 let client = Client::new();
                 // let _body = client.get("http://localhost:8444/Health")
                 //     .send()
