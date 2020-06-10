@@ -1,12 +1,11 @@
 use crossbeam::crossbeam_channel::{
-    RecvError, select, unbounded as cross_unbounded, Receiver as CrossReceiver, Sender as CrossSender,
+    select, unbounded as cross_unbounded, Receiver as CrossReceiver, RecvError,
+    Sender as CrossSender,
 };
 
-// use tokio::sync::mpsc as tokio_mpsc;
-// use tokio::sync::mpsc::{unbounded_channel as tokio_channel, UnboundedSender as TokioSender, UnboundedReceiver as TokioReceiver};
 use crate::{FortunaIsolate, JSEnv};
+use std::fmt::Debug;
 use std::thread;
-use std::fmt::{Debug};
 
 type ServerTx = CrossSender<String>;
 type ServerRx = CrossReceiver<Command>;
@@ -107,17 +106,6 @@ impl JSClient {
         self.rx.recv().unwrap()
     }
 }
-
-// impl Drop for JSClient {
-//     fn drop(&mut self) {
-//         // let _exit = Command {
-//         //     operation: Ops::EXIT,
-//         //     payload: "exit".to_string()
-//         // };
-//         // self.tx.send(exit).unwrap();
-//         println!("> Dropping client");
-//     }
-// }
 
 pub fn create_js_env(js_env: &JSEnv) -> JSClient {
     let (tx1, rx1) = cross_unbounded::<Command>();

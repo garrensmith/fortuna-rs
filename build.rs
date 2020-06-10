@@ -1,6 +1,6 @@
 use std::env;
 use std::fs;
-use std::fs::{read_dir};
+use std::fs::read_dir;
 use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

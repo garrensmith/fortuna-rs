@@ -1,8 +1,9 @@
-use reqwest::Client;
 use futures::{stream, StreamExt};
+use reqwest::Client;
 
+use ateles::JsRequest;
 use prost::Message;
-use ateles::{JsRequest};
+use std::fs;
 use std::time::Instant;
 
 pub mod ateles {
@@ -10,25 +11,25 @@ pub mod ateles {
 }
 
 /*
-    steps:
-    * rewrite map funs
-    * add map.js
-    * init map funs
-    * map docs
- */
+   steps:
+   * rewrite map funs
+   * add map.js
+   * map docs
+*/
 
 async fn rewrite_map_funs(client: &Client) {
     let js_req = JsRequest {
         action: 0,
         script: "rewriteFun".to_string(),
         args: vec!["\"function(doc) {emit(doc._id, null);}\"".to_string()],
-        timeout: 5000
+        timeout: 5000,
     };
 
     let mut resp = Vec::<u8>::new();
     js_req.encode(&mut resp).unwrap();
 
-    let _body = client.post("http://localhost:8444/Ateles/Execute")
+    let _body = client
+        .post("http://localhost:8444/Ateles/Execute")
         .body(resp)
         .send()
         .await
@@ -36,8 +37,6 @@ async fn rewrite_map_funs(client: &Client) {
         .text()
         .await
         .unwrap();
-
-    // println!("text: {:?}", body);
 }
 
 async fn add_map_js(client: &Client) {
@@ -45,13 +44,14 @@ async fn add_map_js(client: &Client) {
         action: 1,
         script: MAP_JS.to_string(),
         args: vec!["file=map.js".to_string(), "line=1".to_string()],
-        timeout: 5000
+        timeout: 5000,
     };
 
     let mut resp = Vec::<u8>::new();
     js_req.encode(&mut resp).unwrap();
 
-    let _body = client.post("http://localhost:8444/Ateles/Execute")
+    let _body = client
+        .post("http://localhost:8444/Ateles/Execute")
         .body(resp)
         .send()
         .await
@@ -59,23 +59,21 @@ async fn add_map_js(client: &Client) {
         .text()
         .await
         .unwrap();
-
-    // println!("text: {:?}", body);
 }
-
 
 async fn init_map(client: &Client) {
     let js_req = JsRequest {
         action: 2,
         script: "init".to_string(),
         args: vec!["{}".to_string(), MAP_FUNS.to_string()],
-        timeout: 5000
+        timeout: 5000,
     };
 
     let mut resp = Vec::<u8>::new();
     js_req.encode(&mut resp).unwrap();
 
-    let _body = client.post("http://localhost:8444/Ateles/Execute")
+    let _body = client
+        .post("http://localhost:8444/Ateles/Execute")
         .body(resp)
         .send()
         .await
@@ -83,22 +81,21 @@ async fn init_map(client: &Client) {
         .text()
         .await
         .unwrap();
-
-    // println!("text: {:?}", body);
 }
 
-async fn map_doc(client: &Client) {
+async fn map_doc(client: &Client, doc: &str) {
     let js_req = JsRequest {
         action: 2,
         script: "mapDoc".to_string(),
-        args: vec![DOC.to_string()],
-        timeout: 5000
+        args: vec![doc.to_string()],
+        timeout: 5000,
     };
 
     let mut resp = Vec::<u8>::new();
     js_req.encode(&mut resp).unwrap();
 
-    let _body = client.post("http://localhost:8444/Ateles/Execute")
+    let _body = client
+        .post("http://localhost:8444/Ateles/Execute")
         .body(resp)
         .send()
         .await
@@ -106,45 +103,30 @@ async fn map_doc(client: &Client) {
         .text()
         .await
         .unwrap();
-
-    // println!("text: {:?}", body);
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
-    let reqs = 0..1;
+    let reqs = 0..1000;
+    // let doc = fs::read_to_string("test.json")?;
 
-    let fetches = stream::iter(
-        reqs.map(|_| {
-            async {
-                let docs = 0..10000;
-                let client = Client::new();
-                // let _body = client.get("http://localhost:8444/Health")
-                //     .send()
-                //     .await
-                //     .unwrap()
-                //     .text()
-                //     .await
-                //     .unwrap();
-
-                rewrite_map_funs(&client).await;
-                add_map_js(&client).await;
-                init_map(&client).await;
-                let doc_fetches = stream::iter(
-                    docs.map(|_| {
-                        async {
-                            map_doc(&client).await;
-                        }
-                    })
-                ).buffer_unordered(1).collect::<Vec<()>>();
-                doc_fetches.await;
-
-                // println!("text: {:?}", body);
-                // Ok(())
-            }
-        })
-    ).buffer_unordered(60).collect::<Vec<()>>();
+    let fetches = stream::iter(reqs.map(|_| {
+        async {
+            let docs = 0..100;
+            let client = Client::new();
+            add_map_js(&client).await;
+            init_map(&client).await;
+            let doc_fetches = stream::iter(docs.map(|_| async {
+                map_doc(&client, DOC).await;
+            }))
+            .buffer_unordered(1)
+            .collect::<Vec<()>>();
+            doc_fetches.await;
+        }
+    }))
+    .buffer_unordered(60)
+    .collect::<Vec<()>>();
     println!("Running...");
     fetches.await;
 
@@ -154,10 +136,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 const DOC: &str = "{\"_id\":\"foo\",\"value\":1}";
 
-// const MAP_FUNS: &str = "[\"(function (doc) {\\n    emit(null, null);\\n});\"]";
 const MAP_FUNS: &str = "
     [
-        \"(function (doc) { emit(null, null);});\",
+        \"(function (doc) { emit(doc._id, doc.value);});\",
          \"(function (doc) {\
            let val = 0;\
            for(let i = 0; i < 1000; i++) {\
@@ -217,6 +198,3 @@ function mapDoc(docJSON) {
     return mapResults;
 }
 "#;
-
-
-
