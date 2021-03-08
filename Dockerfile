@@ -1,11 +1,3 @@
-# FROM rust:1.50 as builder
-# FROM registry.access.redhat.com/ubi8/go-toolset:latest as builder
-
-# USER root
-
-# RUN yum update -y --setopt=tsflags=nodocs && \
-#     yum clean all -y
-
 FROM registry.access.redhat.com/ubi8/ubi-minimal as builder
 USER root
 
